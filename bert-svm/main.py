@@ -43,15 +43,16 @@ def main(args):
 
     if args.do_train:
         trainer.train()
-
-    if args.do_eval:
-        trainer.load_model()
         trainer.evaluate("test")
 
-    if args.do_pred:
-        trainer.load_model()
-        texts = read_prediction_text(args)
-        trainer.predict(texts, tokenizer)
+#     if args.do_eval:
+#         trainer.load_model()
+#         trainer.evaluate("test")
+
+#     if args.do_pred:
+#         trainer.load_model()
+#         texts = read_prediction_text(args)
+#         trainer.predict(texts, tokenizer)
 
 
 if __name__ == '__main__':
