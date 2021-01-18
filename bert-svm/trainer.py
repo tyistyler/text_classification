@@ -127,6 +127,7 @@ class Trainer(object):
                 self.best_precision = precision
                 self.best_epoch = _
                 joblib.dump(self.svm_model, args.model_dir+'/svm.pkl')
+                joblib.dump(self.pca, args.model_dir+'/pca.pkl')
                 
                 print('save model finished')
             print('best p_score is', self.best_precision)
@@ -160,7 +161,10 @@ class Trainer(object):
         dev_y = None
 
         self.model.eval()#验证模式
-
+        
+        # self.svm_model = joblib.load(os.path.join(self.args.model_dir+".svm.pkl"))
+        # self.pca =  joblib.load(os.path.join(self.args.model_dir+".pca.pkl"))
+        
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
             batch = tuple(t.to(self.device) for t in batch)
             with torch.no_grad():# 关闭梯度计算
@@ -192,180 +196,4 @@ class Trainer(object):
             f.write("\n")
             f.close()
         return precision
-
-#     def save_model(self):
-#         # Save model checkpoint (Overwrite)
-#         output_dir = os.path.join(self.args.model_dir)
-
-#         if not os.path.exists(output_dir):
-#             os.makedirs(output_dir)
-#         model_to_save = self.model.module if hasattr(self.model, 'module') else self.model
-#         model_to_save.save_pretrained(output_dir)
-#         torch.save(self.args, os.path.join(output_dir, 'training_config.bin'))
-#         logger.info("Saving model checkpoint to %s", output_dir)
-
-#     def load_model(self):
-#         # Check whether model exists
-#         if not os.path.exists(self.args.model_dir):
-#             raise Exception("Model doesn't exists! Train first!")
-
-#         try:
-#             self.bert_config = self.config_class.from_pretrained(self.args.model_dir)
-#             logger.info("***** Config loaded *****")
-#             self.model = self.model_class.from_pretrained(self.args.model_dir, config=self.bert_config,
-#                                     args=self.args, intent_label_lst=self.intent_label_lst
-#                                     )
-#             # self.model = self.model_class.from_pretrained(self.args.model_dir, config=self.bert_config,
-#             #                                               args=self.args,slot_label_lst=self.slot_label_lst)
-#             self.model.to(self.device)
-#             logger.info("***** Model Loaded *****")
-#         except:
-#             raise Exception("Some model files might be missing...")
-
-#     def _convert_texts_to_tensors(self, text, tokenizer,
-#                                   cls_token_segment_id=0,
-#                                   pad_token_segment_id=0,
-#                                   sequence_a_segment_id=0,
-#                                   mask_padding_with_zero=True):
-#         """
-#         Only add input_ids, attention_mask, token_type_ids
-#         Labels aren't required.
-#         """
-#         # Setting based on the current model type
-#         cls_token = tokenizer.cls_token
-#         sep_token = tokenizer.sep_token
-#         unk_token = tokenizer.unk_token
-#         pad_token_id = tokenizer.pad_token_id
-
-#         input_ids_1_batch = []
-#         attention_mask_1_batch = []
-#         token_type_ids_1_batch = []
-
-#         input_ids_2_batch = []
-#         attention_mask_2_batch = []
-#         token_type_ids_2_batch = []
-
-#         slot_label_mask_batch = []
-
-#         tokens_1 = []
-#         tokens_2 = []
-#             # slot_label_mask = []
-#         words_1, words_2 = text.split()
-#         for w1, w2 in zip(words_1, words_2):
-
-#             word_tokens_1 = tokenizer.tokenize(w1)
-#             word_tokens_2 = tokenizer.tokenize(w2)
-#             if not word_tokens_1:
-#                 word_tokens_1 = [unk_token]  # For handling the bad-encoded word
-#             if not word_tokens_2:
-#                 word_tokens_2 = [unk_token]
-#             tokens_1.extend(word_tokens_1)
-#             tokens_2.extend(word_tokens_2)
-#                 # Real label position as 0 for the first token of the word, and padding ids for the remaining tokens
-#                 # slot_label_mask.extend([0] + [self.pad_token_label_id] * (len(word_tokens) - 1))
-
-#             # Account for [CLS] and [SEP]
-#         special_tokens_count = 2
-#         if len(tokens_1) > self.args.max_seq_len - special_tokens_count:
-#             tokens_1 = tokens_1[:(self.args.max_seq_len - special_tokens_count)]
-#         if len(tokens_2) > self.args.max_seq_len - special_tokens_count:
-#             tokens_2 = tokens_2[:(self.args.max_seq_len - special_tokens_count)]
-
-
-#             # Add [SEP] token
-#         tokens_1 += [sep_token]
-#         tokens_2 += [sep_token]
-#             # slot_label_mask += [self.pad_token_label_id]
-#         token_type_ids_1 = [sequence_a_segment_id] * len(tokens_1)
-#         token_type_ids_2 = [sequence_a_segment_id] * len(tokens_2)
-#         # Add [CLS] token
-#         tokens_1 = [cls_token] + tokens_1
-#         token_type_ids_1 = [cls_token_segment_id] + token_type_ids_1
-
-#         tokens_2 = [cls_token] + tokens_1
-#         token_type_ids_2 = [cls_token_segment_id] + token_type_ids_2
-
-#         input_ids_1 = tokenizer.convert_tokens_to_ids(tokens_1)
-#         input_ids_2 = tokenizer.convert_tokens_to_ids(tokens_2)
-#         # The mask has 1 for real tokens and 0 for padding tokens. Only real
-#         # tokens are attended to.非填充部分的token对应1
-#         attention_mask_1 = [1 if mask_padding_with_zero else 0] * len(input_ids_1)
-#         attention_mask_2 = [1 if mask_padding_with_zero else 0] * len(input_ids_2)
-
-#         # Zero-pad up to the sequence length.
-#         padding_length_1 = self.args.max_seq_len - len(input_ids_1)
-#         input_ids_1 = input_ids_1 + ([pad_token_id] * padding_length_1)
-#         attention_mask_1 = attention_mask_1 + ([0 if mask_padding_with_zero else 1] * padding_length_1)
-#         token_type_ids_1 = token_type_ids_1 + ([pad_token_segment_id] * padding_length_1)
-
-#         padding_length_2 = self.args.max_seq_len - len(input_ids_2)
-#         input_ids_2 = input_ids_2 + ([pad_token_id] * padding_length_2)
-#         attention_mask_2 = attention_mask_2 + ([0 if mask_padding_with_zero else 1] * padding_length_2)
-#         token_type_ids_2 = token_type_ids_2 + ([pad_token_segment_id] * padding_length_2)
-#         # slot_label_mask = slot_label_mask + ([self.pad_token_label_id] * padding_length)
-
-#         input_ids_1_batch.append(input_ids_1)
-#         attention_mask_1_batch.append(attention_mask_1)
-#         token_type_ids_1_batch.append(token_type_ids_1)
-
-#         input_ids_2_batch.append(input_ids_2)
-#         attention_mask_2_batch.append(attention_mask_2)
-#         token_type_ids_2_batch.append(token_type_ids_2)
-            
-#             # slot_label_mask_batch.append(slot_label_mask)
-
-#         # Making tensor that is batch size of 1
-#         input_ids_1_batch = torch.tensor(input_ids_1_batch, dtype=torch.long).to(self.device)
-#         attention_mask_1_batch = torch.tensor(attention_mask_1_batch, dtype=torch.long).to(self.device)
-#         token_type_ids_1_batch = torch.tensor(token_type_ids_1_batch, dtype=torch.long).to(self.device)
-
-#         input_ids_2_batch = torch.tensor(input_ids_2_batch, dtype=torch.long).to(self.device)
-#         attention_mask_2_batch = torch.tensor(attention_mask_2_batch, dtype=torch.long).to(self.device)
-#         token_type_ids_2_batch = torch.tensor(token_type_ids_2_batch, dtype=torch.long).to(self.device)
-
-#         # slot_label_mask_batch = torch.tensor(slot_label_mask_batch, dtype=torch.long).to(self.device)
-
-#         # dataset = TensorDataset(input_ids_batch, attention_mask_batch, token_type_ids_batch)
-
-#         return input_ids_1_batch, attention_mask_1_batch, token_type_ids_1_batch, input_ids_2_batch, attention_mask_2_batch, token_type_ids_2_batch
-
-#     def predict(self, texts, tokenizer):
-#         batch = self._convert_texts_to_tensors(texts, tokenizer)
-#         # print(batch[0])
-#         # print(batch[1])
-#         # print(batch[2])
-#         # Predict
-#         # sampler = SequentialSampler(dataset)
-#         # data_loader = DataLoader(dataset, sampler=sampler, batch_size=self.args.batch_size)
-
-#         intent_preds = None
-#         # slot_label_mask = batch[3]
-#         self.model.eval()
-
-#         # for batch in tqdm(data_loader, desc='Predicting'):
-#             # batch = tuple(t.to(self.device) for t in batch)
-#         with torch.no_grad():
-#             inputs = {'input_ids_1': batch[0],
-#                       'attention_mask_1': batch[1],
-#                       'token_type_ids_1':batch[2],
-#                       'input_ids_2': batch[3],
-#                       'attention_mask_2': batch[4],
-#                       'token_type_ids_2': batch[5],
-#                       'intent_label_ids': None
-#                       }
-
-#             outputs = self.model(**inputs)
-#             _, (intent_logits, slot_logits) = outputs[:2]  # loss doesn't needed
-
-#         # Intent prediction
-#         intent_preds = intent_logits.detach().cpu().numpy()
-#         intent_preds = np.argmax(intent_preds, axis=1)
-#         intent_list = []
-#         for intent_idx in intent_preds:
-#             intent_list.append(self.intent_label_lst[intent_idx])
-
-#         # print(intent_list)
-#         return intent_list[0]
-
-
 
